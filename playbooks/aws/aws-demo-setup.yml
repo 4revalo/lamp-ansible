@@ -1,0 +1,108 @@
+# demo_setup.yml
+
+- hosts: localhost
+  connection: local
+  gather_facts: False
+
+  tasks:
+
+   # CheckIP
+    - name: Ermittlung IP
+      uri:
+        url: http://checkip.amazonaws.com
+        return_content: yes
+      register: myip
+
+    # Example that prints the loopback address and gateway for each host
+    - debug: msg="Meine IP ist derzeit {{ myip.content.strip() }}."
+
+    - name: Erzeuge eine Security Group
+      ec2_group:
+        name: my-security-group
+        description: Meine Security-Group (Demo)
+        region: us-east-1
+        rules:
+#        - proto: tcp
+#          from_port: 80
+#          to_port: 80
+#          cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            from_port: 22
+            to_port: 22
+            cidr_ip: "{{ myip.content.strip() }}/32"
+#        - proto: tcp
+#          from_port: 443
+#          to_port: 443
+#          group_id: amazon-elb/sg-87654321/amazon-elb-sg
+#        - proto: tcp
+#          from_port: 3306
+#          to_port: 3306
+#          group_id: 123412341234/sg-87654321/exact-name-of-sg
+#        - proto: udp
+#          from_port: 10050
+#          to_port: 10050
+#          cidr_ip: 10.0.0.0/8
+#        - proto: udp
+#          from_port: 10051
+#          to_port: 10051
+#          group_id: sg-12345678
+#        - proto: all
+#          # the containing group name may be specified here
+#          group_name: example
+#      rules_egress:
+#        - proto: tcp
+#          from_port: 80
+#          to_port: 80
+#          cidr_ip: 0.0.0.0/0
+#          group_name: example-other
+#          # description to use if example-other needs to be created
+#          group_desc: other example EC2 group
+
+    - name: Provision a set of instances
+      ec2:
+         key_name: my-key-pair
+         group: my-security-group
+         instance_type: t2.micro
+         #image: ami-12663b7a # Red Hat Enterprise Linux 7.1 (HVM), SSD Volume Type - ami-12663b7a
+         image: ami-1ecae776 # Amazon Linux AMI 2015.03 (HVM), SSD Volume Type - ami-1ecae776
+         region: us-east-1 
+         wait: true
+         exact_count: 1
+         count_tag:
+            Name: Demo
+         instance_tags:
+            Name: Demo
+      register: ec2
+
+    - name: Wait for ssh server to come up
+      wait_for: host={{ item.public_dns_name }} port=22 search_regex=OpenSSH
+      with_items: ec2.tagged_instances	
+
+    - name: Add all instance public IPs to host group
+      add_host: hostname={{ item.public_ip }} groups=ec2hosts
+      with_items: ec2.tagged_instances # tagged_instances enthält alle Instancen, egal ob neu erzeugt oder bereits existent
+
+- hosts: ec2hosts
+  name: configuration play
+  user: ec2-user
+  sudo: true
+  gather_facts: true
+
+  # nach: https://docs.ansible.com/playbooks_best_practices.html
+  tasks:
+
+     - name: Update all packages
+       yum: name=* state=latest
+
+     - name: be sure ntp is installed
+       yum: pkg=ntp state=installed
+
+     - name: be sure ntp is configured
+       template: src=ntp.conf.j2 dest=/etc/ntp.conf
+
+     - name: restart ntpd
+       service: name=ntpd state=restarted
+
+     - name: be sure ntpd is running and enabled 
+       service: name=ntpd state=running enabled=yes
+
