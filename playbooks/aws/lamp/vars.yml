@@ -1,0 +1,13 @@
+---
+deployment_vars:
+  # amazon ami (ami-1ecae776)
+  image: ami-1ecae776
+  image_name:
+  region: us-east-1
+  ssh_user: ec2_user
+  sudo: yes
+  keypair: my-key-pair
+  type: t2.micro
+  security_groups: [ 'my-security-group' ]
+  vpc_subnet:
+  assign_public_ip:
