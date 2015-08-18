@@ -49,27 +49,33 @@
 - fail: msg="Could not find requested ami"
   when: not ami_result.results
 
-- set_fact:
-    latest_ami: "{{ ami_result.results }}"
-    user_data: "{{ lookup('template', '../templates/user_data.j2') }}"
-    volume_defs:
-      master:
-        root:
-          volume_size: "{{ lookup('env', 'os_master_root_vol_size') | default(25, true) }}"
-          device_type: "{{ lookup('env', 'os_master_root_vol_type') | default('gp2', true) }}"
-          iops: "{{ lookup('env', 'os_master_root_vol_iops') | default(500, true) }}"
-      node:
-        root:
-          volume_size: "{{ lookup('env', 'os_node_root_vol_size') | default(25, true) }}"
-          device_type: "{{ lookup('env', 'os_node_root_vol_type') | default('gp2', true) }}"
-          iops: "{{ lookup('env', 'os_node_root_vol_iops') | default(500, true) }}"
-        docker:
-          volume_size: "{{ lookup('env', 'os_docker_vol_size') | default(32, true) }}"
-          device_type: "{{ lookup('env', 'os_docker_vol_type') | default('gp2', true) }}"
-          iops: "{{ lookup('env', 'os_docker_vol_iops') | default(500, true) }}"
+- debug: msg="Festlegung der Volumen-Daten"
 
 - set_fact:
-    volumes: "{{ volume_defs | oo_ec2_volume_definition(host_type, docker_vol_ephemeral | bool) }}"
+    latest_ami: "{{ ami_result.results }}"
+#    user_data: "{{ lookup('template', '../templates/user_data.j2') }}"
+#    volume_defs:
+#      master:
+#        root:
+#          volume_size: "{{ lookup('env', 'os_master_root_vol_size') | default(25, true) }}"
+#          device_type: "{{ lookup('env', 'os_master_root_vol_type') | default('gp2', true) }}"
+#          iops: "{{ lookup('env', 'os_master_root_vol_iops') | default(500, true) }}"
+#      node:
+#        root:
+#          volume_size: "{{ lookup('env', 'os_node_root_vol_size') | default(25, true) }}"
+#          device_type: "{{ lookup('env', 'os_node_root_vol_type') | default('gp2', true) }}"
+#          iops: "{{ lookup('env', 'os_node_root_vol_iops') | default(500, true) }}"
+#        docker:
+#          volume_size: "{{ lookup('env', 'os_docker_vol_size') | default(32, true) }}"
+#          device_type: "{{ lookup('env', 'os_docker_vol_type') | default('gp2', true) }}"
+#          iops: "{{ lookup('env', 'os_docker_vol_iops') | default(500, true) }}"
+#
+#- debug: msg="Volumes festlegen"
+#
+#- set_fact:
+#    volumes: "{{ volume_defs | oo_ec2_volume_definition(host_type, docker_vol_ephemeral | bool) }}"
+
+- debug: msg="Launch der Instancen"
 
 - name: Launch instance(s)
   ec2:
@@ -90,7 +96,15 @@
       env: "{{ env }}"
       host-type: "{{ host_type }}"
       env-host-type: "{{ env_host_type }}"
-    volumes: "{{ volumes }}"
+#    volumes: "{{ volumes }}"
+    volumes:
+      - device_name: /dev/xvda
+        snapshot: snap-b772aec8
+        device_type: root
+        iops: 1000
+        volume_size: 25
+        delete_on_termination: true
+
   register: ec2
 
 - name: Add Name tag to instances

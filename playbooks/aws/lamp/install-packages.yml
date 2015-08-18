@@ -1,0 +1,9 @@
+---
+- name: install yum packages
+  yum: pkg={{ item }} 
+  sudo: true
+  with_items:
+    httpd24 
+    php56 
+    mysql55-server 
+    php56-mysqlnd
