@@ -1,6 +1,6 @@
 ---
 - name: install yum packages
-  yum: pkg={{ item }} 
+  yum: name={{ item }} state=latest 
   sudo: true
   with_items:
     httpd24 
