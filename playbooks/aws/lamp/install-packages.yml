@@ -1,9 +1,60 @@
 ---
-- name: install yum packages
-  yum: name={{ item }} state=latest 
-  sudo: true
-  with_items:
-    httpd24 
-    php56 
-    mysql55-server 
-    php56-mysqlnd
+- hosts: webservers
+  remote_user: ec2-user
+  vars:
+    deployer_user: ec2-user
+    deployer_user_ssh_key_file: .ssh/id_rsa
+    bo_gitlab_api: https://gitlab.berlinonline.net/api/v3/
+    bo_gitlab_key_title: workathome4
+  vars_files:
+    - secrets.yml
+
+  tasks:
+ 
+    - name: update all packages
+      yum: name=* state=latest
+      sudo: true
+ 
+    - name: install yum packages
+      yum: name={{ item }} state=latest 
+      sudo: true
+      with_items:
+        - httpd24 
+        - php56 
+        - mysql55-server 
+        - php56-mysqlnd
+
+    - name: install git
+      yum: name=git state=latest
+      sudo: true
+
+# das reicht so nicht, sudo pip install ist gefragt
+#    - name: install httplib2 (für gitlab notwendig)
+#      yum: name=python-httplib2 state=latest
+#      sudo: true
+
+    - name: install httplib2 (für uri, Zugriff auf gitlab)
+      pip: name=httplib2
+
+    - name: erzeuge ssh-key
+      user: name={{ deployer_user }} generate_ssh_key=yes 
+      register: deployer_user_changed
+
+    - name: Assign ssh key to a variable
+      shell: cat /home/{{ deployer_user }}/{{ deployer_user_ssh_key_file }}.pub
+      register: deployer_user_public_key
+#      when: deployer_user_changed
+
+# ist noch nicht idempotent, sollte abfragen, ob der Key so noch/schon existiert und diesen updaten/löschen und neu anlegen
+    - name: Push the generated ssh key to the Gitlab instance
+      uri: >
+        url="{{ bo_gitlab_api }}user/keys"
+        method=POST
+        status_code=201
+        HEADER_PRIVATE-TOKEN="{{ bo_gitlab_token }}"
+        HEADER_Content-Type="application/json"
+        body="{\"title\": \"{{ bo_gitlab_key_title }}\", \"key\": \"{{ deployer_user_public_key.stdout_lines.0 }}\"}"
+#      when: deploy_user_created.changed
+
+#    - name: git clone d115
+ 
